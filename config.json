@@ -1,0 +1,29 @@
+{
+  "location": { "lat": 43.059, "lon": -77.612 },
+  "poll": { "fast_sec": 1, "minute_sec": 60, "debounce_sec": 2 },
+  "files": {
+    "csv": "meter.csv",
+    "state": "state.json",
+    "control": "control.json"
+  },
+  "indoor_sensor": {
+    "ads_channel": 0,
+    "v_supply": 3.3,
+    "r_fixed": 100000.0,
+    "r0": 100000.0,
+    "beta": 3950.0,
+    "t0_c": 25.0,
+    "ema_alpha": 0.2
+  },
+  "furnace_gpio": 17,
+  "fan": {
+    "tuya": {
+      "device_id": "eb5f0939516f2fd74au1na",
+      "ip": "192.168.1.76",
+      "local_key": "qEW`0j(f|)D{g?H6",
+      "version": "3.3",
+      "dps": "1"
+    },
+    "follow_heat": true
+  }
+}

@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Logs and process output
+*.log
+*.out
+
+# SQLite databases
+*.db
+!forecast_history.db
+*.sqlite
+*.sqlite3
+
+# Local CSV history / meter data
+meter.csv
+Weather_history.csv
+
+# Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyo
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Runtime state (regenerated on device)
+state.json
+control.json
+
+# Local backup copies
+*.bak*
