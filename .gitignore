@@ -1,4 +1,4 @@
-# Python
+# Python caches / build artifacts
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,8 +7,8 @@ __pycache__/
 *.egg
 *.egg-info/
 .eggs/
-dist/
 build/
+dist/
 *.manifest
 *.spec
 
@@ -21,23 +21,27 @@ ENV/
 # Logs and process output
 *.log
 *.out
+*.pid
 
-# SQLite databases
+# Databases
 *.db
-!forecast_history.db
+*.db-*
 *.sqlite
 *.sqlite3
+*.sqlite3-*
 
-# Local CSV history / meter data
-meter.csv
-Weather_history.csv
+# Generated CSV outputs / local history
+*.csv
 
-# Cache
+# Runtime state generated on the device
+state.json
+control.json
+
+# Tool caches
 .cache/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-*.pyo
 
 # Editor / OS
 .DS_Store
@@ -45,10 +49,9 @@ Weather_history.csv
 *~
 .idea/
 .vscode/
+*.code-workspace
 
-# Runtime state (regenerated on device)
-state.json
-control.json
-
-# Local backup copies
+# Local backup files
+*.bak
 *.bak*
+*.orig
