@@ -60,16 +60,18 @@ Most of the project uses plain CSV files for easy inspection and troubleshooting
 - `daily_weather.py` - Builds daily weather history from logged dates
 - `build_forecast_accuracy.py` - Creates forecast-vs-actual comparison data
 - `config.example.json` - Safe template for local configuration
-- `config.json` - Location, sensor, file, and device settings
+- `config.json` - Local-only configuration created from `config.example.json`; do not commit real values
 - `rates.json` - Heating, cooling, blower, and electric cost settings
-- `meter.csv` - Main HVAC reading log
-- `Weather_history.csv` - Daily weather history
-- `forecast_history.db` - SQLite database for forecast snapshots
-- `forecast_snapshots.csv` - CSV copy of saved forecast snapshots
-- `forecast_vs_actual_24h.csv` - Precomputed forecast accuracy output
 - `restart_hvac.sh` - Helper script for restarting the local services
 - `static/` - Static web assets such as the favicon
-- `old/` - Older versions and experiments kept for reference
+
+Generated/runtime data files are created locally by the scripts and should not be committed:
+
+- `meter.csv` - Generated main HVAC reading log
+- `Weather_history.csv` - Generated daily weather history
+- `forecast_history.db` - Generated SQLite database for forecast snapshots
+- `forecast_snapshots.csv` - Generated CSV copy of saved forecast snapshots
+- `forecast_vs_actual_24h.csv` - Generated forecast accuracy output
 
 ## Basic Setup and Run Notes
 
@@ -106,4 +108,3 @@ I wanted a simple way to see what my HVAC system was doing over time and compare
 - How does outdoor weather affect HVAC use?
 - Are recent forecasts close to what actually happened?
 - What might the heating or blower costs look like?
-
