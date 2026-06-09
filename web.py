@@ -20,9 +20,14 @@ def add_nocache(resp):
     return resp
 
 HTML = r"""
-<!doctype html><html><head><meta charset="utf-8">
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Language" content="en">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>HVAC Meter</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <style>
 :root{--bg:#0b0f14;--panel:#0e141b;--line:#22303c;--text:#e6ebf0;--muted:#9fb3c8;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
@@ -106,13 +111,24 @@ canvas{width:100% !important;height:100% !important;display:block}
       <button class="btn" data-h="24">24h</button>
       <button class="btn" data-h="48">48h</button>
       <button class="btn" data-h="168">1w</button>
+      <button class="btn" data-h="720">1mo</button>
     </div>
     <div class="chart-box"><canvas id="c"></canvas></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script>
-let hours=24, raw=null, chart=null;
+let hours=168, raw=null, chart=null;
+const INSIDE_BLUE='#b8c7d9';       // neutral inside line color
+const OUTSIDE_ORANGE='#ff8c42';      // fallback outdoor line color
+
+function outsideTempColor(temp) {
+  if (temp == null) return OUTSIDE_ORANGE;
+  if (temp < 70) return '#4db8ff';
+  if (temp <= 78) return '#5fd35f';
+  if (temp <= 85) return '#ffb347';
+  return '#ff5c5c';
+}
 
 function el(id){return document.getElementById(id)}
 async function getState(){ const r = await fetch('/state?_=' + Date.now(), {cache:'no-store'}); return await r.json(); }
@@ -166,40 +182,56 @@ function sliceByHours(d,hrs){
 
 function draw(view){
   if(chart) chart.destroy();
+
+  // Core HVAC chart datasets (unchanged behavior). order: lines on top of heat bars.
+  const datasets=[
+    {type:'bar', label:'Heat (0/100)', data:view.heat01, yAxisID:'y', order:2, borderWidth:0, borderRadius:3, barPercentage:0.95, categoryPercentage:1.0},
+    {type:'line', label:'Inside (°F)', data:view.inside, yAxisID:'y', order:1, tension:0.25, pointRadius:0, borderWidth:2, borderColor:INSIDE_BLUE, backgroundColor:INSIDE_BLUE},
+    {
+      type:'line',
+      label:'Outside (°F)',
+      data:view.outside,
+      yAxisID:'y',
+      order:1,
+      tension:0.25,
+      pointRadius:0,
+      borderWidth:2,
+      borderColor:OUTSIDE_ORANGE,
+      backgroundColor:OUTSIDE_ORANGE,
+      segment:{
+        borderColor:ctx=>outsideTempColor(ctx.p1.parsed.y)
+      }
+    }
+  ];
+
   chart = new Chart(document.getElementById('c').getContext('2d'), {
     data:{
       labels:view.labels,
-      datasets:[
-        {type:'bar', label:'Heat (0/100)', data:view.heat01, yAxisID:'y', borderWidth:0, borderRadius:3, barPercentage:0.95, categoryPercentage:1.0},
-        {type:'line', label:'Inside (°F)', data:view.inside, yAxisID:'y', tension:0.25, pointRadius:0, borderWidth:2},
-        {type:'line', label:'Outside (°F)', data:view.outside, yAxisID:'y', tension:0.25, pointRadius:0, borderWidth:2}
-      ]
+      datasets:datasets
     },
     options:{
-  maintainAspectRatio:false,
-  interaction:{mode:'index', intersect:false},
-  scales:{
-    x:{
-      ticks:{
-        autoSkip: true,
-        maxTicksLimit: 8,   // <= about 8 labels max, even for 1 week
-        maxRotation: 0,
-        minRotation: 0,
-        callback: function(value){
-          const label = this.getLabelForValue(value); // ISO timestamp
-          // Show as "11-16 07:35"
-          return label.replace('T',' ').slice(5,16);
+      maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      scales:{
+        x:{
+          ticks:{
+            autoSkip:true,
+            maxTicksLimit:8,
+            maxRotation:0,
+            minRotation:0,
+            callback:function(value){
+              const label=this.getLabelForValue(value);
+              return label.replace('T',' ').slice(5,16);
+            }
+          }
+        },
+        y:{
+          min:-20,
+          max:100,
+          title:{display:true,text:'Scale (°F) and Heat 0/100'}
         }
       }
-    },
-    y:{
-      min:-20,
-      max:100,
-      title:{display:true,text:'Scale (°F) and Heat 0/100'}
     }
-  }
-}
-
   });
 }
 
@@ -478,6 +510,7 @@ def costs():
 # ---------- Forecast page ----------
 
 FORECAST_DB = os.path.join(BASE, "forecast_history.db")
+FORECAST_CSV = os.path.join(BASE, "forecast_snapshots.csv")
 
 def weather_code_text(code):
     """Open-Meteo WMO weather_code -> short label."""
@@ -517,6 +550,12 @@ def weather_code_text(code):
         return labels.get(int(code), "Unknown")
     except (TypeError, ValueError):
         return "Unknown"
+
+def _fmt_temp(v):
+    return "—" if v is None else f"{v:.1f}°F"
+
+def _fmt_err(v):
+    return "—" if v is None else f"{v:+.1f}°F"
 
 FORECAST_HTML = r"""
 <!doctype html><html><head><meta charset="utf-8">
@@ -577,6 +616,7 @@ th,td{
 }
 
 .spacer{flex:1}
+
 </style>
 </head>
 <body>
@@ -626,29 +666,25 @@ th,td{
   <table>
     <thead>
       <tr>
-        <th>Snapshot</th>
         <th>Date</th>
-        <th>Day Ahead</th>
-        <th>Pred High</th>
         <th>Actual High</th>
-        <th>High Error</th>
-        <th>Pred Low</th>
+        <th>High Overshoot</th>
+        <th>High Undershoot</th>
         <th>Actual Low</th>
-        <th>Low Error</th>
+        <th>Low Overshoot</th>
+        <th>Low Undershoot</th>
       </tr>
     </thead>
     <tbody>
     {% for row in accuracy_rows %}
       <tr>
-        <td>{{ row.pulled_at }}</td>
         <td>{{ row.forecast_date }}</td>
-        <td>{{ row.days_ahead }}</td>
-        <td>{{ row.pred_high }}</td>
         <td>{{ row.actual_high }}</td>
-        <td>{{ row.high_error }}</td>
-        <td>{{ row.pred_low }}</td>
+        <td>{{ row.high_overshoot }}</td>
+        <td>{{ row.high_undershoot }}</td>
         <td>{{ row.actual_low }}</td>
-        <td>{{ row.low_error }}</td>
+        <td>{{ row.low_overshoot }}</td>
+        <td>{{ row.low_undershoot }}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -674,17 +710,26 @@ def forecast():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
+    today = datetime.now().date()
+    today_str = today.isoformat()
+
     cur.execute("""
-        SELECT id, pulled_at
-        FROM forecast_snapshots
-        ORDER BY id DESC
+        SELECT s.id, s.pulled_at
+        FROM forecast_snapshots s
+        WHERE EXISTS (
+            SELECT 1
+            FROM daily_forecast d
+            WHERE d.snapshot_id = s.id
+              AND d.forecast_date >= ?
+        )
+        ORDER BY s.id DESC
         LIMIT 1
-    """)
+    """, (today_str,))
 
     latest = cur.fetchone()
 
     if not latest:
-        return "No forecast snapshots yet"
+        return "No current or future forecast rows yet"
 
     snapshot_id = latest["id"]
     snapshot_time = latest["pulled_at"]
@@ -692,53 +737,97 @@ def forecast():
     cur.execute("""
         SELECT
             forecast_date,
-            days_ahead,
             temp_high_f,
             temp_low_f,
             weather_code
         FROM daily_forecast
         WHERE snapshot_id=?
-        ORDER BY days_ahead
-    """, (snapshot_id,))
+          AND forecast_date >= ?
+        ORDER BY forecast_date
+        LIMIT 10
+    """, (snapshot_id, today_str))
 
-    rows = cur.fetchall()
+    rows = []
+    for r in cur.fetchall():
+        forecast_date = r["forecast_date"]
+        try:
+            forecast_day = datetime.strptime(forecast_date, "%Y-%m-%d").date()
+            days_ahead = (forecast_day - today).days
+        except (TypeError, ValueError):
+            days_ahead = ""
+        rows.append({
+            "forecast_date": forecast_date,
+            "days_ahead": days_ahead,
+            "temp_high_f": r["temp_high_f"],
+            "temp_low_f": r["temp_low_f"],
+            "weather_code": r["weather_code"],
+        })
 
     actuals = load_weather_history()
     cur.execute("""
         SELECT
-            s.pulled_at,
             d.forecast_date,
-            d.days_ahead,
             d.temp_high_f,
             d.temp_low_f
         FROM daily_forecast d
-        JOIN forecast_snapshots s ON d.snapshot_id = s.id
-        ORDER BY d.forecast_date DESC, s.pulled_at DESC, d.days_ahead
+        ORDER BY d.forecast_date DESC
     """)
-    def _temp(v):
-        return "—" if v is None else f"{v:.1f}°F"
-    def _err(v):
-        return "—" if v is None else f"{v:+.1f}°F"
 
-    accuracy_rows = []
+    by_date = {}
     for r in cur.fetchall():
-        act = actuals.get(r["forecast_date"])
+        forecast_date = r["forecast_date"]
+        act = actuals.get(forecast_date)
         if not act:
             continue
-        ph, pl = r["temp_high_f"], r["temp_low_f"]
         ah, al = act["high_f"], act["low_f"]
-        he = (ph - ah) if ph is not None and ah is not None else None
-        le = (pl - al) if pl is not None and al is not None else None
+        ph, pl = r["temp_high_f"], r["temp_low_f"]
+        day = by_date.setdefault(forecast_date, {
+            "forecast_date": forecast_date,
+            "actual_high": ah,
+            "actual_low": al,
+            "high_overshoot": None,
+            "high_overshoot_error": None,
+            "high_undershoot": None,
+            "high_undershoot_error": None,
+            "low_overshoot": None,
+            "low_overshoot_error": None,
+            "low_undershoot": None,
+            "low_undershoot_error": None,
+        })
+        if ph is not None and ah is not None:
+            high_error = ph - ah
+            if high_error > 0:
+                if day["high_overshoot_error"] is None or high_error > day["high_overshoot_error"]:
+                    day["high_overshoot"] = ph
+                    day["high_overshoot_error"] = high_error
+            elif high_error < 0:
+                miss = abs(high_error)
+                if day["high_undershoot_error"] is None or miss > day["high_undershoot_error"]:
+                    day["high_undershoot"] = ph
+                    day["high_undershoot_error"] = miss
+        if pl is not None and al is not None:
+            low_error = pl - al
+            if low_error > 0:
+                if day["low_overshoot_error"] is None or low_error > day["low_overshoot_error"]:
+                    day["low_overshoot"] = pl
+                    day["low_overshoot_error"] = low_error
+            elif low_error < 0:
+                miss = abs(low_error)
+                if day["low_undershoot_error"] is None or miss > day["low_undershoot_error"]:
+                    day["low_undershoot"] = pl
+                    day["low_undershoot_error"] = miss
+
+    accuracy_rows = []
+    for d in sorted(by_date, reverse=True):
+        row = by_date[d]
         accuracy_rows.append({
-            "pulled_at": r["pulled_at"],
-            "forecast_date": r["forecast_date"],
-            "days_ahead": r["days_ahead"],
-            "pred_high": _temp(ph),
-            "actual_high": _temp(ah),
-            "high_error": _err(he),
-            "pred_low": _temp(pl),
-            "actual_low": _temp(al),
-            "low_error": _err(le),
+            "forecast_date": row["forecast_date"],
+            "actual_high": _fmt_temp(row["actual_high"]),
+            "high_overshoot": _fmt_temp(row["high_overshoot"]),
+            "high_undershoot": _fmt_temp(row["high_undershoot"]),
+            "actual_low": _fmt_temp(row["actual_low"]),
+            "low_overshoot": _fmt_temp(row["low_overshoot"]),
+            "low_undershoot": _fmt_temp(row["low_undershoot"]),
         })
 
     con.close()

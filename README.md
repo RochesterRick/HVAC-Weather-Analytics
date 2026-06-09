@@ -59,6 +59,7 @@ Most of the project uses plain CSV files for easy inspection and troubleshooting
 - `forecast_logger.py` - Saves forecast snapshots
 - `daily_weather.py` - Builds daily weather history from logged dates
 - `build_forecast_accuracy.py` - Creates forecast-vs-actual comparison data
+- `config.example.json` - Safe template for local configuration
 - `config.json` - Location, sensor, file, and device settings
 - `rates.json` - Heating, cooling, blower, and electric cost settings
 - `meter.csv` - Main HVAC reading log
@@ -78,9 +79,10 @@ Basic flow:
 
 1. Create or activate a Python virtual environment.
 2. Install the Python dependencies used by the scripts, such as Flask, requests, gpiozero, Adafruit ADS1x15 support, and tinytuya.
-3. Update `config.json` for your location, sensor settings, GPIO pin, and fan device.
-4. Update `rates.json` with local cost assumptions.
-5. Run the logger and web app:
+3. Copy `config.example.json` to `config.json`.
+4. Fill in `config.json` with your local location, sensor settings, GPIO pin, and fan device values.
+5. Update `rates.json` with local cost assumptions.
+6. Run the logger and web app:
 
 ```bash
 python3 meter.py

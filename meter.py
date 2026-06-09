@@ -169,29 +169,58 @@ def read_indoor_c():
 
 _last_outdoor_ts = 0.0
 _cached_outdoor_c = float("nan")
+_nws_station_url = None
+
+def _request_json(url, timeout=6):
+    import requests  # ensure in scope
+    headers = {"User-Agent": "HVACpi/1.0"}
+    r = requests.get(url, headers=headers, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+def _open_meteo_current_c():
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={LAT:.5f}&longitude={LON:.5f}"
+        f"&current=temperature_2m&temperature_unit=celsius"
+    )
+    return float(_request_json(url, timeout=6)["current"]["temperature_2m"])
+
+def _weather_gov_current_c():
+    global _nws_station_url
+    if _nws_station_url is None:
+        points = _request_json(f"https://api.weather.gov/points/{LAT},{LON}", timeout=8)
+        stations_url = points["properties"]["observationStations"]
+        stations = _request_json(stations_url, timeout=8)
+        features = stations.get("features", [])
+        if not features:
+            raise RuntimeError("weather.gov returned no observation stations")
+        _nws_station_url = features[0]["id"]
+
+    obs = _request_json(f"{_nws_station_url}/observations/latest", timeout=8)
+    temp = obs.get("properties", {}).get("temperature", {}).get("value")
+    if temp is None:
+        raise RuntimeError("weather.gov latest observation has no temperature")
+    return float(temp)
 
 def outdoor_c():
-    """Return current outdoor temp in °C using Open-Meteo, cached ~1 minute."""
+    """Return current outdoor temp in °C, cached ~1 minute."""
     global _last_outdoor_ts, _cached_outdoor_c
     now = time.time()
     if (now - _last_outdoor_ts) < 55 and not math.isnan(_cached_outdoor_c):
         return _cached_outdoor_c
     if not _have_requests:
         return float("nan")
-    try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={LAT:.5f}&longitude={LON:.5f}"
-            f"&current=temperature_2m&temperature_unit=celsius"
-        )
-        import requests  # ensure in scope
-        r = requests.get(url, timeout=6)
-        r.raise_for_status()
-        _cached_outdoor_c = float(r.json()["current"]["temperature_2m"])
-        _last_outdoor_ts = now
-        return _cached_outdoor_c
-    except Exception:
-        return float("nan")
+
+    for source in (_open_meteo_current_c, _weather_gov_current_c):
+        try:
+            _cached_outdoor_c = source()
+            _last_outdoor_ts = now
+            return _cached_outdoor_c
+        except Exception as e:
+            print(f"[WARN] outdoor temp source failed: {e}")
+
+    return float("nan")
 
 def fan_get():
     """Read current fan state from Tuya plug. Returns True/False/None."""

@@ -34,6 +34,7 @@ ENV/
 *.csv
 
 # Runtime state generated on the device
+config.json
 state.json
 control.json
 
@@ -57,4 +58,5 @@ control.json
 *.orig
 
 # Archived local code
+old/
 old/

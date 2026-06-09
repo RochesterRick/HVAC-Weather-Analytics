@@ -62,8 +62,8 @@ if have_systemd; then
 
   # Extra safety: kill stray processes (in case an old nohup is still around)
   log "Killing stray python processes (if any)…"
-  pkill -f "python3.*web.py"   2>/dev/null || true
-  pkill -f "python3.*meter.py" 2>/dev/null || true
+  pkill -f "python.*web.py"   2>/dev/null || true
+  pkill -f "python.*meter.py" 2>/dev/null || true
 
   log "Ensuring port $WEB_PORT is free…"
   if ! wait_port_free "$WEB_PORT"; then
@@ -98,8 +98,8 @@ else
   log "systemd units NOT found. Using nohup mode…"
 
   log "Stopping old processes…"
-  pkill -f "python3.*web.py"   2>/dev/null || true
-  pkill -f "python3.*meter.py" 2>/dev/null || true
+  pkill -f "python.*web.py"   2>/dev/null || true
+  pkill -f "python.*meter.py" 2>/dev/null || true
   sleep 1
 
   log "Ensuring port $WEB_PORT is free…"
@@ -121,8 +121,8 @@ else
   wait_port_listen "$WEB_PORT" || { log "Web did not bind to port $WEB_PORT"; exit 1; }
 
   log "PIDs:"
-  pgrep -af "python3 .*meter.py" || true
-  pgrep -af "python3 .*web.py"   || true
+  pgrep -af "python .*meter.py" || true
+  pgrep -af "python .*web.py"   || true
 fi
 
 health_check
