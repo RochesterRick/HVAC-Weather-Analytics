@@ -105,12 +105,3 @@ I wanted a simple way to see what my HVAC system was doing over time and compare
 - Are recent forecasts close to what actually happened?
 - What might the heating or blower costs look like?
 
-## Future Ideas
-
-- Cleaner setup instructions
-- Better service/install documentation for a fresh Raspberry Pi
-- More forecast accuracy views
-- More reliable long-term data cleanup or archiving
-- Better mobile layout for the dashboard
-- Optional export or backup tools
-- More notes on wiring and hardware assumptions
