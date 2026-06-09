@@ -55,3 +55,6 @@ control.json
 *.bak
 *.bak*
 *.orig
+
+# Archived local code
+old/
